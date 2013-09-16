@@ -85,7 +85,6 @@ sqlitelog_get_account_id(PurpleAccount *account)
 		purple_debug_error("sqlitelog", "Couldn't add account: %s\n", sqlite3_errmsg(db));
 	}
 	
-	sqlite3_finalize(stmt);
 	return 0;
 }
 
