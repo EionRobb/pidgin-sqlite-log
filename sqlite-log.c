@@ -46,6 +46,10 @@ sqlitelog_init_db()
 	sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS [accounts] (id INTEGER PRIMARY KEY AUTOINCREMENT, [username] VARCHAR(255), [protocol_id] VARCHAR(64))", NULL, NULL, NULL);
 	sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS [logs] ([id] INTEGER PRIMARY KEY AUTOINCREMENT, [account_id] INTEGER NOT NULL REFERENCES accounts(id), [type] INTEGER NOT NULL, [name] VARCHAR(255), [starttime] TIMESTAMP, [endtime] TIMESTAMP)", NULL, NULL, NULL);
 	sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS [messages] ([id] INTEGER PRIMARY KEY AUTOINCREMENT, [log_id] INTEGER NOT NULL REFERENCES logs(id), [type] INTEGER NOT NULL, [who] VARCHAR(255), [message] TEXT, [time] TIMESTAMP)", NULL, NULL, NULL);
+	
+	// Maintenance - make everything into y-m-d h:i:s for better date math :)
+	sqlite3_exec(db, "UPDATE logs SET starttime = DATETIME(starttime, 'unixepoch') WHERE starttime NOT LIKE '%-%'", NULL, NULL, NULL);
+	sqlite3_exec(db, "UPDATE messages SET time = DATETIME(time, 'unixepoch') WHERE time NOT LIKE '%-%'", NULL, NULL, NULL);
 }
 
 static gint64
@@ -199,7 +203,7 @@ sqlitelog_read (PurpleLog *log, PurpleLogReadFlags *flags)
 	readdata = g_string_new(NULL);
 	account_id = sqlitelog_get_account_id(log->account);
 	
-	sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, messages.time FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND logs.starttime=DATETIME(?, 'unixepoch')", -1, &stmt, NULL);
+	sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, STRFTIME('%s', messages.time) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND logs.starttime=DATETIME(?, 'unixepoch')", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, log->type);
