@@ -57,7 +57,7 @@ sqlitelog_get_account_id(PurpleAccount *account)
 	
 	sqlite3_prepare(db, "SELECT id FROM accounts WHERE username = ? AND protocol_id = ?", -1, &stmt, NULL);
 	
-	sqlite3_bind_text(stmt, 1, purple_account_get_username(account), -1, NULL);
+	sqlite3_bind_text(stmt, 1, purple_normalize(account, purple_account_get_username(account)), -1, NULL);
 	sqlite3_bind_text(stmt, 2, purple_account_get_protocol_id(account), -1, NULL);
 	
 	res = sqlite3_step(stmt);
@@ -71,7 +71,7 @@ sqlitelog_get_account_id(PurpleAccount *account)
 	sqlite3_finalize(stmt);
 	sqlite3_prepare(db, "INSERT INTO accounts (username, protocol_id) VALUES (?, ?)", -1, &stmt, NULL);
 	
-	sqlite3_bind_text(stmt, 1, purple_account_get_username(account), -1, NULL);
+	sqlite3_bind_text(stmt, 1, purple_normalize(account, purple_account_get_username(account)), -1, NULL);
 	sqlite3_bind_text(stmt, 2, purple_account_get_protocol_id(account), -1, NULL);
 	
 	res = sqlite3_step(stmt);
@@ -106,18 +106,18 @@ sqlitelog_create(PurpleLog *log)
 	
 	account_id = sqlitelog_get_account_id(account);
 	
-	sqlite3_prepare(db, "INSERT INTO logs (account_id, type, name, starttime) VALUES (?, ?, ?, ?)", -1, &stmt, NULL);
+	sqlite3_prepare(db, "INSERT INTO logs (account_id, type, name, starttime) VALUES (?, ?, ?, DATETIME(?, 'unixepoch'))", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, log->type);
-	sqlite3_bind_text(stmt, 3, log->name, -1, NULL);
+	sqlite3_bind_text(stmt, 3, purple_normalize(log->account, log->name), -1, NULL);
 	sqlite3_bind_int(stmt, 4, log->time);
 	
 	res = sqlite3_step(stmt);
 	log_id = sqlite3_last_insert_rowid(db);
 	sqlite3_finalize(stmt);
 	
-	if (sqlite3_prepare(db, "INSERT INTO messages (log_id, type, who, message, time) VALUES (?, @type, @who, @message, @time)", -1, &logstmt, NULL) == SQLITE_OK)
+	if (sqlite3_prepare(db, "INSERT INTO messages (log_id, type, who, message, time) VALUES (?, @type, @who, @message, DATETIME(@time, 'unixepoch'))", -1, &logstmt, NULL) == SQLITE_OK)
 	{
 		sqlite3_bind_int64(logstmt, 1, log_id); 
 		log->logger_data = logstmt;
@@ -163,11 +163,12 @@ sqlitelog_list(PurpleLogType type, const char *name, PurpleAccount *account)
 	account_id = sqlitelog_get_account_id(account);
 	protocol_id = purple_account_get_protocol_id(account);
 	
-	sqlite3_prepare(db, "SELECT starttime FROM logs WHERE account_id=? AND type=? AND name=?", -1, &stmt, NULL);
+	sqlite3_prepare(db, "SELECT STRFTIME('%s', starttime) FROM logs WHERE account_id=? AND type=? AND name IN (?,?)", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, type);
-	sqlite3_bind_text(stmt, 3, name, -1, NULL);
+	sqlite3_bind_text(stmt, 3, name, -1, NULL); // Old SQLite logging
+	sqlite3_bind_text(stmt, 4, purple_normalize(account, name), -1, NULL); // New SQLite logging
 	
 	while((res = sqlite3_step(stmt)) == SQLITE_ROW)
 	{
@@ -198,12 +199,13 @@ sqlitelog_read (PurpleLog *log, PurpleLogReadFlags *flags)
 	readdata = g_string_new(NULL);
 	account_id = sqlitelog_get_account_id(log->account);
 	
-	sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, messages.time FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name=? AND logs.starttime=?", -1, &stmt, NULL);
+	sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, messages.time FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND logs.starttime=DATETIME(?, 'unixepoch')", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, log->type);
-	sqlite3_bind_text(stmt, 3, log->name, -1, NULL);
-	sqlite3_bind_int(stmt, 4, log->time);
+	sqlite3_bind_text(stmt, 3, log->name, -1, NULL); // Old SQLite logging
+	sqlite3_bind_text(stmt, 4, purple_normalize(log->account, log->name), -1, NULL); // New SQLite logging
+	sqlite3_bind_int(stmt, 5, log->time);
 	
 	while((res = sqlite3_step(stmt)) == SQLITE_ROW)
 	{
@@ -277,11 +279,11 @@ sqlitelog_finalize(PurpleLog *log)
 	sqlite3_finalize(stmt);
 	
 	account_id = sqlitelog_get_account_id(log->account);
-	sqlite3_prepare(db, "UPDATE logs SET endtime=CURRENT_TIMESTAMP WHERE logs.account_id=? AND logs.type=? AND logs.name=? AND logs.starttime=? AND endtime IS NULL", -1, &stmt, NULL);
+	sqlite3_prepare(db, "UPDATE logs SET endtime=CURRENT_TIMESTAMP WHERE logs.account_id=? AND logs.type=? AND logs.name=? AND logs.starttime=DATETIME(?, 'unixepoch') AND endtime IS NULL", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, log->type);
-	sqlite3_bind_text(stmt, 3, log->name, -1, NULL);
+	sqlite3_bind_text(stmt, 3, purple_normalize(log->account, log->name), -1, NULL);
 	sqlite3_bind_int(stmt, 4, log->time);
 	
 	sqlite3_step(stmt);
@@ -297,11 +299,11 @@ sqlitelog_remove(PurpleLog *log)
 	
 	account_id = sqlitelog_get_account_id(log->account);
 	
-	sqlite3_prepare(db, "DELETE FROM logs WHERE logs.account_id=? AND logs.type=? AND logs.name=? AND logs.starttime=?", -1, &stmt, NULL);
+	sqlite3_prepare(db, "DELETE FROM logs WHERE logs.account_id=? AND logs.type=? AND logs.name=? AND logs.starttime=DATETIME(?, 'unixepoch')", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, log->type);
-	sqlite3_bind_text(stmt, 3, log->name, -1, NULL);
+	sqlite3_bind_text(stmt, 3, purple_normalize(log->account, log->name), -1, NULL);
 	sqlite3_bind_int(stmt, 4, log->time);
 	
 	ret = sqlite3_step(stmt);
@@ -371,7 +373,7 @@ static PurplePluginInfo info =
 	PURPLE_PRIORITY_DEFAULT,                            /**< priority       */
 	"core-sqlite-log",                                /**< id             */
 	("SQLite Logging"),                                 /**< name           */
-	"0.1",                                  /**< version        */
+	"0.2",                                  /**< version        */
 
 	/** summary */
 	("Log conversations to SQLite backend."),
