@@ -4,20 +4,20 @@
 
 //#define SQLITE_THREADSAFE 0
 //#define SQLITE_OMIT_LOAD_EXTENSION
-#include "sqlite3.h"
+#include <sqlite3.h>
 
-#include "debug.h"
-#include "log.h"
-#include "plugin.h"
-#include "pluginpref.h"
-#include "prefs.h"
-#include "stringref.h"
-#include "util.h"
-#include "version.h"
-#include "xmlnode.h"
+#include <debug.h>
+#include <log.h>
+#include <plugin.h>
+#include <pluginpref.h>
+#include <prefs.h>
+#include <stringref.h>
+#include <util.h>
+#include <version.h>
+#include <xmlnode.h>
 
 #ifdef _WIN32
-#	include "win32dep.h"
+#	include <win32dep.h>
 #endif
 
 static sqlite3 *db = NULL;
