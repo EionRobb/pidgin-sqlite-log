@@ -4,17 +4,17 @@
 
 //#define SQLITE_THREADSAFE 0
 //#define SQLITE_OMIT_LOAD_EXTENSION
-#include <sqlite3.h>
+#include "sqlite3.h"
 
-#include <debug.h>
-#include <log.h>
-#include <plugin.h>
-#include <pluginpref.h>
-#include <prefs.h>
-#include <stringref.h>
-#include <util.h>
-#include <version.h>
-#include <xmlnode.h>
+#include "debug.h"
+#include "log.h"
+#include "plugin.h"
+#include "pluginpref.h"
+#include "prefs.h"
+#include "stringref.h"
+#include "util.h"
+#include "version.h"
+#include "xmlnode.h"
 
 #ifdef _WIN32
 #	include "win32dep.h"
@@ -167,7 +167,7 @@ sqlitelog_list(PurpleLogType type, const char *name, PurpleAccount *account)
 	account_id = sqlitelog_get_account_id(account);
 	protocol_id = purple_account_get_protocol_id(account);
 	
-	sqlite3_prepare(db, "SELECT STRFTIME('%s', starttime) FROM logs WHERE account_id=? AND type=? AND name IN (?,?)", -1, &stmt, NULL);
+	sqlite3_prepare(db, "SELECT STRFTIME('%s', starttime) FROM logs WHERE account_id=? AND type=? AND name IN (?,?) AND (SELECT COUNT(*) FROM messages WHERE log_id=logs.id) > 0", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, type);
