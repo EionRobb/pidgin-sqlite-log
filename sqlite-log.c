@@ -20,6 +20,10 @@
 #	include <win32dep.h>
 #endif
 
+#define PLUGIN_ID			"core-sqlite-log"
+#define PREF_PREFIX			"/plugins/core/" PLUGIN_ID
+#define PREF_GROUPBYDATE	PREF_PREFIX "/groupbydate"
+
 static sqlite3 *db = NULL;
 static PurpleLogLogger *sqlite_logger;
 
@@ -167,7 +171,10 @@ sqlitelog_list(PurpleLogType type, const char *name, PurpleAccount *account)
 	account_id = sqlitelog_get_account_id(account);
 	protocol_id = purple_account_get_protocol_id(account);
 	
-	sqlite3_prepare(db, "SELECT STRFTIME('%s', starttime) FROM logs WHERE account_id=? AND type=? AND name IN (?,?) AND (SELECT COUNT(*) FROM messages WHERE log_id=logs.id) > 0", -1, &stmt, NULL);
+	if (purple_prefs_get_bool(PREF_GROUPBYDATE))
+		sqlite3_prepare(db, "SELECT DISTINCT STRFTIME('%s', DATE(messages.time)) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?)", -1, &stmt, NULL);
+	else
+		sqlite3_prepare(db, "SELECT STRFTIME('%s', starttime) FROM logs WHERE account_id=? AND type=? AND name IN (?,?) AND (SELECT COUNT(*) FROM messages WHERE log_id=logs.id) > 0", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, type);
@@ -203,7 +210,10 @@ sqlitelog_read (PurpleLog *log, PurpleLogReadFlags *flags)
 	readdata = g_string_new(NULL);
 	account_id = sqlitelog_get_account_id(log->account);
 	
-	sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, STRFTIME('%s', messages.time) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND logs.starttime=DATETIME(?, 'unixepoch')", -1, &stmt, NULL);
+	if (purple_prefs_get_bool(PREF_GROUPBYDATE))
+		sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, STRFTIME('%s', messages.time) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND DATE(messages.time)=DATE(?, 'unixepoch') ORDER BY messages.time", -1, &stmt, NULL);
+	else
+		sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, STRFTIME('%s', messages.time) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND logs.starttime=DATETIME(?, 'unixepoch') ORDER BY messages.time", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, log->type);
@@ -301,9 +311,15 @@ sqlitelog_remove(PurpleLog *log)
 	int ret;
 	gint64 account_id;
 	
+	//TODO fix this to delete the messages as well as the logs
+	return FALSE;
+	
 	account_id = sqlitelog_get_account_id(log->account);
 	
-	sqlite3_prepare(db, "DELETE FROM logs WHERE logs.account_id=? AND logs.type=? AND logs.name=? AND logs.starttime=DATETIME(?, 'unixepoch')", -1, &stmt, NULL);
+	if (purple_prefs_get_bool(PREF_GROUPBYDATE))
+		sqlite3_prepare(db, "TODO", -1, &stmt, NULL);
+	else
+		sqlite3_prepare(db, "DELETE FROM logs WHERE logs.account_id=? AND logs.type=? AND logs.name=? AND logs.starttime=DATETIME(?, 'unixepoch')", -1, &stmt, NULL);
 	
 	sqlite3_bind_int64(stmt, 1, account_id);
 	sqlite3_bind_int(stmt, 2, log->type);
@@ -323,7 +339,8 @@ sqlitelog_remove(PurpleLog *log)
 static void
 init_plugin(PurplePlugin *plugin)
 {
-
+	purple_prefs_add_none(PREF_PREFIX);
+	purple_prefs_add_bool(PREF_GROUPBYDATE, FALSE);
 }
 
 static gboolean
@@ -339,7 +356,7 @@ plugin_load(PurplePlugin *plugin)
 									   NULL, //sqlitelog_total_size,
 									   NULL, //sqlitelog_list_syslog,
 									   NULL, //sqlitelog_get_log_sets,
-									   sqlitelog_remove,
+									   NULL, // TODO sqlitelog_remove,
 									   NULL, //sqlitelog_is_deletable
 									   
 									   NULL //padding
@@ -365,6 +382,33 @@ plugin_unload(PurplePlugin *plugin)
 	return TRUE;
 }
 
+static PurplePluginPrefFrame *
+get_plugin_pref_frame(PurplePlugin *plugin)
+{
+	PurplePluginPrefFrame *frame;
+	PurplePluginPref *pref;
+
+	frame = purple_plugin_pref_frame_new();
+
+	pref = purple_plugin_pref_new_with_name_and_label(PREF_GROUPBYDATE,
+			("Group conversation history by date"));
+	purple_plugin_pref_frame_add(frame, pref);
+
+	return frame;
+}
+
+static PurplePluginUiInfo prefs_info = {
+	get_plugin_pref_frame,
+	0,
+	NULL,
+
+	/* padding */
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+
 static PurplePluginInfo info =
 {
 	PURPLE_PLUGIN_MAGIC,
@@ -375,7 +419,7 @@ static PurplePluginInfo info =
 	0,                                                /**< flags          */
 	NULL,                                             /**< dependencies   */
 	PURPLE_PRIORITY_DEFAULT,                            /**< priority       */
-	"core-sqlite-log",                                /**< id             */
+	PLUGIN_ID,                             	          /**< id             */
 	("SQLite Logging"),                                 /**< name           */
 	"0.2",                                  /**< version        */
 
@@ -392,7 +436,7 @@ static PurplePluginInfo info =
 	NULL,                                             /**< destroy        */
 	NULL,                                             /**< ui_info        */
 	NULL,                                             /**< extra_info     */
-	NULL,                                      /**< prefs_info     */
+	&prefs_info,                                      /**< prefs_info     */
 	NULL,                                             /**< actions        */
 
 	/* padding */
