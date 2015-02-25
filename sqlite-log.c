@@ -362,6 +362,8 @@ plugin_load(PurplePlugin *plugin)
 									   NULL //padding
 									   );
 	purple_log_logger_add(sqlite_logger);
+	// make new logger active, by xiehuc@gmail.com
+	purple_log_logger_set(sqlite_logger);
 	
 	sqlitelog_init_db();
 
