@@ -1,13 +1,25 @@
+GTK_PIDGIN_INCLUDES= `pkg-config --cflags gtk+-2.0 pidgin`
 
-.PHONY:	all clean install
+CC ?= clang
+CFLAGS+= -O2 -Wall -fpic -fpie -g -pipe
+LDFLAGS+= -shared -fPIC -Wl,-z,relro,-z,now
+PREFIX=/usr
+SOPATH=/lib64/pidgin
 
-all: sqlite-log.so
+INCLUDES = \
+      $(GTK_PIDGIN_INCLUDES)
 
 sqlite-log.so: sqlite-log.c
-	gcc sqlite-log.c `pkg-config --cflags --libs purple glib-2.0 sqlite3` -g -O2 -fPIC -pipe -o sqlite-log.so -shared
+	$(CC) sqlite-log.c $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o sqlite-log.so
+
+install: sqlite-log.so
+	mkdir -p ${DESTDIR}${PREFIX}${SOPATH}
+	chmod 444  ${DESTDIR}${PREFIX}${SOPATH}
+
+	install -m 444 sqlite-log.so ${DESTDIR}${PREFIX}${SOPATH}
+
+uninstall:
+	rm -f ~/.purple/plugins/sqlite-log.so
 
 clean:
 	rm -f sqlite-log.so
-
-install:
-	cp sqlite-log.so ~/.purple/plugins/
