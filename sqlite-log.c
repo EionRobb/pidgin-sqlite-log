@@ -54,6 +54,11 @@ sqlitelog_init_db()
 	// Maintenance - make everything into y-m-d h:i:s for better date math :)
 	sqlite3_exec(db, "UPDATE logs SET starttime = DATETIME(starttime, 'unixepoch') WHERE starttime NOT LIKE '%-%'", NULL, NULL, NULL);
 	sqlite3_exec(db, "UPDATE messages SET time = DATETIME(time, 'unixepoch') WHERE time NOT LIKE '%-%'", NULL, NULL, NULL);
+	
+	sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS [accounts_username_protocol] ON accounts ([username], [protocol_id])", NULL, NULL, NULL);
+	sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS [logs_account_type_name] ON logs ([account_id], [type], [name])", NULL, NULL, NULL);
+	sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS [messages_log_id] ON messages ([log_id])", NULL, NULL, NULL);
+	sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS [messages_time_log] ON messages ([time], [log_id])", NULL, NULL, NULL);
 }
 
 static gint64
