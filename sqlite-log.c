@@ -182,6 +182,8 @@ sqlitelog_list(PurpleLogType type, const char *name, PurpleAccount *account)
 		list = g_list_prepend(list, log);
 	}
 	
+	sqlite3_finalize(stmt);
+	
 	return list;
 }
 
@@ -262,6 +264,8 @@ sqlitelog_read (PurpleLog *log, PurpleLogReadFlags *flags)
 		g_free(msg_fixed);
 		g_free(escaped_from);
 	}
+	
+	sqlite3_finalize(stmt);
 	
 	return g_string_free(readdata, FALSE);
 }
