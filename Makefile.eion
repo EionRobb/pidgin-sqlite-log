@@ -1,0 +1,27 @@
+
+
+PIDGIN_TREE_TOP ?= ../pidgin-2.10.11
+LIBPURPLE_DIR ?= $(PIDGIN_TREE_TOP)/libpurple
+WIN32_DEV_TOP ?= $(PIDGIN_TREE_TOP)/../win32-dev
+PURPLE_INCLUDES = -I. -I$(LIBPURPLE_DIR) -I$(WIN32_DEV_TOP)/glib-2.28.8/include -I$(WIN32_DEV_TOP)/glib-2.28.8/include/glib-2.0 -I$(WIN32_DEV_TOP)/glib-2.28.8/lib/glib-2.0/include -L$(LIBPURPLE_DIR) -L$(WIN32_DEV_TOP)/glib-2.28.8/lib  -lpurple -lintl -lglib-2.0 -lgobject-2.0 -g -ggdb -static-libgcc -lz
+
+CC := $(WIN32_DEV_TOP)/mingw-4.7.2/bin/gcc
+CFLAGS += -O2 -Wall -g -pipe
+LDFLAGS += -shared
+
+
+.PHONY: all
+
+all: sqlite-log.dll
+
+sqlite-log.dll: sqlite-log.c
+	$(CC) -DSQLITE_USE_MALLOC_H -DSQLITE_USE_MSIZE sqlite-log.c sqlite3.c $(CFLAGS) $(PURPLE_INCLUDES) $(LDFLAGS) -o sqlite-log.dll
+
+install: sqlite-log.dll
+	install -m 444 sqlite-log.dll C:/Progra~2/Pidgin/plugins/
+
+uninstall:
+	rm -f C:/Progra~2/Pidgin/plugins/sqlite-log.dll
+
+clean:
+	rm -f sqlite-log.dll
