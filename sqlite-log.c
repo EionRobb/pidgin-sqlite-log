@@ -163,7 +163,7 @@ sqlitelog_list(PurpleLogType type, const char *name, PurpleAccount *account)
 	account_id = sqlitelog_get_account_id(account);
 	
 	if (purple_prefs_get_bool(PREF_GROUPBYDATE))
-		sqlite3_prepare(db, "SELECT DISTINCT STRFTIME('%s', DATE(messages.time)) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?)", -1, &stmt, NULL);
+		sqlite3_prepare(db, "SELECT DISTINCT STRFTIME('%s', DATE(messages.time), 'utc') FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?)", -1, &stmt, NULL);
 	else
 		sqlite3_prepare(db, "SELECT STRFTIME('%s', starttime) FROM logs WHERE account_id=? AND type=? AND name IN (?,?) AND (SELECT COUNT(*) FROM messages WHERE log_id=logs.id) > 0", -1, &stmt, NULL);
 	
@@ -204,7 +204,7 @@ sqlitelog_read (PurpleLog *log, PurpleLogReadFlags *flags)
 	account_id = sqlitelog_get_account_id(log->account);
 	
 	if (purple_prefs_get_bool(PREF_GROUPBYDATE))
-		sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, STRFTIME('%s', messages.time) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND DATE(messages.time)=DATE(?, 'unixepoch') ORDER BY messages.time", -1, &stmt, NULL);
+		sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, STRFTIME('%s', messages.time) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND DATE(messages.time, 'utc')=DATE(?, 'unixepoch') ORDER BY messages.time", -1, &stmt, NULL);
 	else
 		sqlite3_prepare(db, "SELECT messages.type, messages.who, messages.message, STRFTIME('%s', messages.time) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?) AND logs.starttime=DATETIME(?, 'unixepoch') ORDER BY messages.time", -1, &stmt, NULL);
 	
