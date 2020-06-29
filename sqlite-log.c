@@ -1,24 +1,15 @@
-#define PURPLE_PLUGINS
-
 #include <stdio.h>
 
 //#define SQLITE_THREADSAFE 0
 //#define SQLITE_OMIT_LOAD_EXTENSION
+#define SQLITE_OMIT_UTF16
 #include <sqlite3.h>
 
-#include <debug.h>
-#include <log.h>
-#include <plugin.h>
-#include <pluginpref.h>
-#include <prefs.h>
-#include <stringref.h>
-#include <util.h>
-#include <version.h>
-#include <xmlnode.h>
+#include <purple.h>
 
-#ifdef _WIN32
-#	include <win32dep.h>
-#endif
+// #ifdef _WIN32
+// #	include <win32dep.h>
+// #endif
 
 #define PLUGIN_ID			"core-sqlite-log"
 #define PREF_PREFIX			"/plugins/core/" PLUGIN_ID
@@ -66,14 +57,13 @@ sqlitelog_get_account_id(PurpleAccount *account)
 {
 	sqlite3_stmt *stmt;
 	gint64 account_id;
-	int res;
 	
 	sqlite3_prepare(db, "SELECT id FROM accounts WHERE username = ? AND protocol_id = ?", -1, &stmt, NULL);
 	
 	sqlite3_bind_text(stmt, 1, purple_normalize(account, purple_account_get_username(account)), -1, NULL);
 	sqlite3_bind_text(stmt, 2, purple_account_get_protocol_id(account), -1, NULL);
 	
-	res = sqlite3_step(stmt);
+	sqlite3_step(stmt);
 	account_id = sqlite3_column_int64(stmt, 0);
 	if (account_id != 0)
 	{
@@ -87,7 +77,7 @@ sqlitelog_get_account_id(PurpleAccount *account)
 	sqlite3_bind_text(stmt, 1, purple_normalize(account, purple_account_get_username(account)), -1, NULL);
 	sqlite3_bind_text(stmt, 2, purple_account_get_protocol_id(account), -1, NULL);
 	
-	res = sqlite3_step(stmt);
+	sqlite3_step(stmt);
 	account_id = sqlite3_last_insert_rowid(db);
 	sqlite3_finalize(stmt);
 	
@@ -108,7 +98,6 @@ sqlitelog_create(PurpleLog *log)
 	PurpleAccount *account = log->account;
 	gint64 log_id;
 	gint64 account_id;
-	int res;
 	
 	g_return_if_fail(log != NULL);
 	if(log->conv == NULL)
@@ -126,7 +115,7 @@ sqlitelog_create(PurpleLog *log)
 	sqlite3_bind_text(stmt, 3, purple_normalize(log->account, log->name), -1, NULL);
 	sqlite3_bind_int(stmt, 4, log->time);
 	
-	res = sqlite3_step(stmt);
+	sqlite3_step(stmt);
 	log_id = sqlite3_last_insert_rowid(db);
 	sqlite3_finalize(stmt);
 	
@@ -143,7 +132,6 @@ static gsize
 sqlitelog_write(PurpleLog *log, PurpleMessageFlags type, const char *from, time_t time, const char *message)
 {
 	sqlite3_stmt *stmt = log->logger_data;
-	int res;
 	
 	if (stmt == NULL)
 	{
@@ -156,7 +144,7 @@ sqlitelog_write(PurpleLog *log, PurpleMessageFlags type, const char *from, time_
 	sqlite3_bind_text(stmt, sqlite3_bind_parameter_index(stmt, "@message"), message, -1, NULL);
 	sqlite3_bind_int(stmt, sqlite3_bind_parameter_index(stmt, "@time"), time);
 	
-	res = sqlite3_step(stmt);
+	sqlite3_step(stmt);
 	sqlite3_reset(stmt);
 	
 	return 1;
@@ -166,7 +154,6 @@ static GList *
 sqlitelog_list(PurpleLogType type, const char *name, PurpleAccount *account)
 {
 	GList *list = NULL;
-	const gchar *protocol_id;
 	PurpleLog *log;
 	sqlite3_stmt *stmt;
 	gint64 account_id;
@@ -174,7 +161,6 @@ sqlitelog_list(PurpleLogType type, const char *name, PurpleAccount *account)
 	int res;
 	
 	account_id = sqlitelog_get_account_id(account);
-	protocol_id = purple_account_get_protocol_id(account);
 	
 	if (purple_prefs_get_bool(PREF_GROUPBYDATE))
 		sqlite3_prepare(db, "SELECT DISTINCT STRFTIME('%s', DATE(messages.time)) FROM messages, logs WHERE messages.log_id=logs.id AND logs.account_id=? AND logs.type=? AND logs.name IN (?,?)", -1, &stmt, NULL);
@@ -357,11 +343,11 @@ plugin_load(PurplePlugin *plugin)
 									   sqlitelog_finalize,
 									   sqlitelog_list,
 									   sqlitelog_read,
-									   NULL, //sqlitelog_size,
+									   sqlitelog_size,
 									   NULL, //sqlitelog_total_size,
 									   NULL, //sqlitelog_list_syslog,
 									   NULL, //sqlitelog_get_log_sets,
-									   NULL, // TODO sqlitelog_remove,
+									   sqlitelog_remove,
 									   NULL, //sqlitelog_is_deletable
 									   
 									   NULL //padding
