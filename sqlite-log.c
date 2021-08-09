@@ -35,7 +35,7 @@ sqlitelog_init_db()
 	}
 	
 	sqlite3_exec(db, "PRAGMA temp_store=MEMORY", NULL, NULL, NULL);
-	sqlite3_exec(db, "PRAGMA synchronous=OFF", NULL, NULL, NULL);
+	sqlite3_exec(db, "PRAGMA journal_mode=WAL", NULL, NULL, NULL);
 	sqlite3_exec(db, "PRAGMA page_size=4096", NULL, NULL, NULL);
 	
 	sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS [accounts] (id INTEGER PRIMARY KEY AUTOINCREMENT, [username] VARCHAR(255), [protocol_id] VARCHAR(64))", NULL, NULL, NULL);
